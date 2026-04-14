@@ -1,0 +1,15 @@
+port: 7880
+bind_addresses:
+    - ""
+rtc:
+    udp_port: 7882
+    tcp_port: 7881
+    use_external_ip: true          # LiveKit auto-detects the EC2 public IP for ICE candidates
+keys:
+    ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+logging:
+    pion_level: error
+    level: info
+
+redis:
+    address: redis:6379

@@ -1,0 +1,10 @@
+livekit
+livekit-api
+livekit-agents
+livekit-plugins-silero
+faster-whisper
+torch
+torchaudio
+boto3
+numpy
+httpx

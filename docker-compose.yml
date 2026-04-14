@@ -1,0 +1,70 @@
+version: '3.8'
+
+# Default log rotation applied to every service.
+# Docker rotates automatically: max 3 files × 50 MB = 150 MB cap per container.
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    logging: *default-logging
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    command: --config /livekit.yaml --node-ip=127.0.0.1
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/livekit.yaml
+    depends_on:
+      - redis
+    logging: *default-logging
+
+  egress:
+    image: livekit/egress:latest
+    command: --config /out/egress.yaml
+    env_file:
+      - .env
+    volumes:
+      - ./egress.yaml:/out/egress.yaml
+    environment:
+      - EGRESS_CONFIG_FILE=/out/egress.yaml
+    depends_on:
+      - livekit-server
+      - redis
+    logging: *default-logging
+
+  worker-agent:
+    build:
+      context: ./worker
+    env_file:
+      - .env
+    volumes:
+      - ./worker:/app
+    depends_on:
+      - livekit-server
+    environment:
+      - PYTHONUNBUFFERED=1
+    logging: *default-logging
+
+  test-client:
+    image: python:3.10
+    command: bash -c "pip install livekit-api redis && python server.py"
+    working_dir: /app
+    env_file:
+      - .env
+    volumes:
+      - ./test-client:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    logging: *default-logging

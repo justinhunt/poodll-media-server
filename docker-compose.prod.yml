@@ -1,0 +1,94 @@
+# Default log rotation applied to every service.
+# Docker rotates automatically: max 3 files × 50 MB = 150 MB cap per container.
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+services:
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    logging: *default-logging
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    command: --config /livekit.prod.yaml --dev
+    restart: always
+    volumes:
+      - ./livekit.prod.yaml:/livekit.prod.yaml
+    depends_on:
+      - redis
+    logging: *default-logging
+
+  egress:
+    image: livekit/egress:latest
+    command: --config /out/egress.prod.yaml
+    env_file: .env.prod
+    restart: always
+    volumes:
+      - ./egress.prod.yaml:/out/egress.prod.yaml
+    environment:
+      - EGRESS_CONFIG_FILE=/out/egress.prod.yaml
+    privileged: true                           # required for egress hardware access
+    depends_on:
+      - livekit-server
+      - redis
+    logging: *default-logging
+
+  worker-agent:
+    build:
+      context: ./worker
+    env_file: .env.prod
+    restart: always
+    volumes:
+      - ./worker:/app
+    depends_on:
+      - livekit-server
+    environment:
+      - PYTHONUNBUFFERED=1
+    # GPU passthrough — works on both G4dn (T4) and G6 (L4)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    logging: *default-logging
+
+  token-server:
+    image: python:3.10
+    command: bash -c "pip install livekit-api redis && python server.py"
+    working_dir: /app
+    env_file: .env.prod
+    restart: always
+    volumes:
+      - ./test-client:/app
+    depends_on:
+      - redis
+    # NOT exposed directly — Caddy proxies it
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"     # ACME HTTP challenge (Let's Encrypt)
+      - "443:443"   # HTTPS — token endpoint + test UI
+      - "7880:7880" # WSS — LiveKit WebSocket signaling
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file: .env.prod
+    depends_on:
+      - token-server
+      - livekit-server
+    logging: *default-logging
+
+volumes:
+  caddy_data:
+  caddy_config:

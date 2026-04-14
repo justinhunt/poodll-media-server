@@ -1,0 +1,25 @@
+For AWS scripts we need to add profile. This allows us to switch between china and global regions
+
+e.g 1
+REGION='cn-northwest-1'
+PROFILE='aws-china'
+
+aws --region ${REGION} --profile ${PROFILE} lambda add-permission
+---------------
+e.g 2
+REGION=$1
+#PROFILE="aws-global"
+#ROLE="arn:aws:iam::479792036497:role/service-role/notifier"
+
+PROFILE="aws-china"
+
+--------------
+aws ec2 create-key-pair --key-name poodll-media-eu-key --profile aws-global --region eu-wes
+t-1 --query "KeyMaterial" --output text > poodll-mediaeu-key.pem
+--------------
+
+VPC ID in EU-WEST-1
+vpc-2a6ec84d
+
+SUBNET-ID in EU-WEST-1
+subnet-c8f45781

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LiveKit STT Client</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: #1e293b;
+            --text-color: #f8fafc;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --border-radius: 12px;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: var(--container-bg);
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background-color: #475569;
+            cursor: not-allowed;
+        }
+
+        .transcript-box {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+        
+        .message {
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 0.5rem;
+        }
+        
+        .speaker {
+            font-weight: 600;
+            color: #38bdf8;
+            margin-right: 0.5rem;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <h1>LiveKit Real-Time STT</h1>
+    <div id="status" class="status">Disconnected</div>
+    
+    <div class="controls" style="flex-direction: column; align-items: flex-start; max-width: 300px; margin: 0 auto 2rem;">
+        <label style="color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; width: 100%;">
+            <input type="checkbox" id="videoToggle"> Enable Video
+        </label>
+        <label style="color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; width: 100%;">
+            <input type="checkbox" id="transcribeToggle" checked> Transcribe Audio
+        </label>
+        <label style="color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; width: 100%;">
+            <input type="checkbox" id="recordToggle" checked> Save Recording (S3)
+        </label>
+        <label style="color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; width: 100%;">
+            <input type="checkbox" id="wordTsToggle" checked> Word Timestamps (.json)
+        </label>
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.5rem;">
+            <span style="color: #94a3b8; font-size: 0.9rem;">Res:</span>
+            <select id="resSelect" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 4px; flex-grow: 1;">
+                <option value="720p">720p (Fast)</option>
+                <option value="1080p" selected>1080p (HQ)</option>
+            </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.5rem;">
+            <span style="color: #94a3b8; font-size: 0.9rem;">Lang:</span>
+            <select id="langSelect" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 4px; flex-grow: 1;">
+                <option value="en" selected>English</option>
+                <option value="ja">Japanese</option>
+                <option value="ru">Russian</option>
+            </select>
+        </div>
+
+        <hr style="border-color: #334155; width: 100%; margin: 0.75rem 0;">
+        <div style="color: #64748b; font-size: 0.75rem; width: 100%; margin-bottom: 0.25rem;">Poodll Settings (optional)</div>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+            <span style="color: #94a3b8; font-size: 0.85rem; min-width: 80px;">Token:</span>
+            <input type="text" id="poodlltokenInput" placeholder="poodlltoken" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; flex-grow: 1; font-size: 0.85rem;">
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+            <span style="color: #94a3b8; font-size: 0.85rem; min-width: 80px;">App ID:</span>
+            <input type="text" id="appidInput" placeholder="mod_solo" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; flex-grow: 1; font-size: 0.85rem;">
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+            <span style="color: #94a3b8; font-size: 0.85rem; min-width: 80px;">Parent:</span>
+            <input type="text" id="parentInput" placeholder="https://demo.poodll.io" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; flex-grow: 1; font-size: 0.85rem;">
+
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+            <span style="color: #94a3b8; font-size: 0.85rem; min-width: 80px;">Owner:</span>
+            <input type="text" id="ownerInput" placeholder="username" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; flex-grow: 1; font-size: 0.85rem;">
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+            <span style="color: #94a3b8; font-size: 0.85rem; min-width: 80px;">Region:</span>
+            <input type="text" id="regionInput" placeholder="us-east-1" value="us-east-1" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; flex-grow: 1; font-size: 0.85rem;">
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+            <span style="color: #94a3b8; font-size: 0.85rem; min-width: 80px;">Expire:</span>
+            <input type="number" id="expiredaysInput" placeholder="180" value="180" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; flex-grow: 1; font-size: 0.85rem;">
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+            <span style="color: #94a3b8; font-size: 0.85rem; min-width: 80px;">Prompt:</span>
+            <input type="text" id="targetsentenceInput" placeholder="e.g. cat, sat, mat (optional)" style="background: var(--bg-color); color: white; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; flex-grow: 1; font-size: 0.85rem;">
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; width: 100%;">
+            <button id="connectBtn" style="flex-grow: 1;">Connect</button>
+            <button id="disconnectBtn" disabled style="flex-grow: 1;">Stop</button>
+        </div>
+    </div>
+
+
+    <div id="videoContainer" style="margin-bottom: 2rem; display: none; justify-content: center;">
+        <video id="localVideo" autoplay muted playsinline style="width: 100%; max-width: 400px; border-radius: var(--border-radius); border: 2px solid var(--accent-color); transform: scaleX(-1);"></video>
+    </div>
+
+    <div id="playbackArea" style="margin-bottom: 2rem; display: none; padding: 1rem; background: #0f172a; border-radius: var(--border-radius);">
+        <h3 style="margin-top: 0;">Recording Playback</h3>
+        <div id="mediaPlayerWrapper"></div>
+        <button onclick="document.getElementById('playbackArea').style.display='none'" style="margin-top: 1rem; background: #ef4444; width: 100%;">Close Player</button>
+    </div>
+
+    <div id="recordingsGallery" style="margin-top: 2rem; border-top: 1px solid #334155; padding-top: 1rem; display: none;">
+        <h3>Recent Recordings</h3>
+        <div id="recordingsList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <!-- Recordings will appear here -->
+        </div>
+    </div>
+
+    <div id="transcript" class="transcript-box">
+        <!-- Transcripts will appear here -->
+    </div>
+</div>
+
+<script src="client.js"></script>
+</body>
+</html>
