@@ -1,5 +1,6 @@
 *.pem
 deploy/region^*.conf
+.env
 .env.prod
 __pycache__/
 

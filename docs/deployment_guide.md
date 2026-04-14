@@ -55,9 +55,17 @@ aws ec2 create-key-pair \
     --region eu-west-1 \
     --profile aws-global \
     --query "KeyMaterial" \
-    --output text > poodll-media-key.pem
+    --output text > poodll-media-key-eu.pem
 
-chmod 400 poodll-media-key.pem
+ aws ec2 create-key-pair \
+    --key-name poodll-media-key \
+    --region cn-northwest-1 \
+    --profile aws-china \
+    --query "KeyMaterial" \
+    --output text > poodll-media-key-cn.pem    
+
+chmod 400 poodll-media-key-eu.pem
+chmod 400 poodll-media-key-cn.pem
 ```
 
 ### 4. Find required AWS identifiers
@@ -129,7 +137,11 @@ Key fields:
 | `REPO_URL` | Your Git repository URL |
 | `ADMIN_EMAIL` | `woof@poodll.com` (for Let's Encrypt certs) |
 
+> [!TIP]
+> **Customizing the Bootstrap**: The `deploy/deploy.sh` script reads the bootstrap logic from **`deploy/userdata.sh`**. If you need to add custom initialization steps (e.g., additional system packages), you can edit `userdata.sh` directly before running the deploy script.
+
 > [!CAUTION]
+
 > Never commit `region-*.conf` files to git — they contain plaintext secrets.
 
 ### Step 2: Run the deploy script

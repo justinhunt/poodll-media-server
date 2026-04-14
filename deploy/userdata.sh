@@ -53,11 +53,23 @@ nvidia-ctk runtime configure --runtime=docker
 systemctl restart docker
 
 # ---------------------------------------------------------------------------
-# 4. Clone repository
+# 4. Associate Elastic IP
 # ---------------------------------------------------------------------------
+# This is aws's magic IP. i.e the script asks AWS: "What is my own unique Instance ID?"
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+aws ec2 associate-address \
+    --instance-id "$INSTANCE_ID" \
+    --allocation-id "${ALLOC_ID}" \
+    --region "${AWS_REGION}" || true
+
+# ---------------------------------------------------------------------------
+# 5. Clone repository
+# ---------------------------------------------------------------------------
+
 # !! Replace with your actual repo URL !!
-REPO_URL="https://github.com/poodll/poodll-media-server.git"
+REPO_URL="${REPO_URL}"
 DEPLOY_DIR="/opt/poodll-media-server"
+
 
 if [ -d "$DEPLOY_DIR" ]; then
     cd "$DEPLOY_DIR" && git pull
@@ -82,7 +94,7 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=${AWS_REGION}
 S3_BUCKET=poodll-audioprocessing-out-${AWS_REGION}
-CLOUDPOODLL_URL=https://cloud.poodll.com
+CLOUDPOODLL_URL=${CLOUDPOODLL_URL}
 REDIS_URL=redis://redis:6379
 ADMIN_EMAIL=${ADMIN_EMAIL}
 MEDIA_DOMAIN=${MEDIA_DOMAIN}

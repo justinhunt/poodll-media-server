@@ -57,6 +57,8 @@ MEDIA_AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
 # ── CloudPoodll + Caddy ───────────────────────────────────────────────────────
 ADMIN_EMAIL="woof@poodll.com"
+CLOUDPOODLL_URL="https://cloud.poodll.com"  # use https://cloud.poodll.cn for China
+
 
 
 # ── Whisper Model ─────────────────────────────────────────────────────────────

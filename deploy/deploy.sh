@@ -148,79 +148,24 @@ envsubst '${LIVEKIT_API_KEY} ${LIVEKIT_API_SECRET}' \
 echo "    livekit.prod.yaml + egress.prod.yaml written"
 
 # ── 6. Build User Data script ─────────────────────────────────────────────────
-log "Building User Data..."
-USER_DATA=$(cat <<USEREOF
-#!/bin/bash
-set -euo pipefail
-exec > >(tee /var/log/userdata.log | logger -t userdata) 2>&1
+log "Building User Data from deploy/userdata.sh..."
 
-echo "=== Poodll Media Server Bootstrap ==="
+# Prepare environment for envsubst
+export LIVEKIT_API_KEY LIVEKIT_API_SECRET MEDIA_DOMAIN AWS_REGION ADMIN_EMAIL CLOUDPOODLL_URL REPO_URL WHISPER_MODEL_SIZE WHISPER_DEVICE WHISPER_COMPUTE_TYPE
+export AWS_ACCESS_KEY_ID="${MEDIA_AWS_ACCESS_KEY_ID}"
+export AWS_SECRET_ACCESS_KEY="${MEDIA_AWS_SECRET_ACCESS_KEY}"
+export LIVEKIT_PUBLIC_URL="wss://${MEDIA_DOMAIN}:7880"
+export ALLOC_ID="${ALLOC_ID}"
 
-# Docker
-dnf install -y docker git gettext
-systemctl enable --now docker
-mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
-     -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+# Define specifically which variables to substitute to avoid breaking instance-local variables like $INSTANCE_ID
+VARS_TO_SUBSTITUTE='$LIVEKIT_API_KEY:$LIVEKIT_API_SECRET:$MEDIA_DOMAIN:$AWS_REGION:$ADMIN_EMAIL:$CLOUDPOODLL_URL:$REPO_URL:$WHISPER_MODEL_SIZE:$WHISPER_DEVICE:$WHISPER_COMPUTE_TYPE:$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY:$LIVEKIT_PUBLIC_URL:$ALLOC_ID'
 
-# NVIDIA Container Toolkit
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
-     > /etc/yum.repos.d/nvidia-container-toolkit.repo
-dnf install -y nvidia-container-toolkit
-nvidia-ctk runtime configure --runtime=docker
-systemctl restart docker
-
-# Associate Elastic IP
-INSTANCE_ID=\$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-aws ec2 associate-address \
-    --instance-id "\$INSTANCE_ID" \
-    --allocation-id "${ALLOC_ID}" \
-    --region "${AWS_REGION}" || true
-
-# Clone / update repo
-DEPLOY_DIR="/opt/poodll-media-server"
-if [ -d "\$DEPLOY_DIR" ]; then
-    cd "\$DEPLOY_DIR" && git pull
-else
-    git clone "${REPO_URL}" "\$DEPLOY_DIR"
+if [ ! -f "deploy/userdata.sh" ]; then
+    error "deploy/userdata.sh not found!"
 fi
-cd "\$DEPLOY_DIR/livekit-worker-setup"
 
-# Write .env.prod
-cat > .env.prod <<ENV
-LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-LIVEKIT_URL=ws://livekit-server:7880
-LIVEKIT_PUBLIC_URL=wss://${MEDIA_DOMAIN}:7880
-AWS_ACCESS_KEY_ID=${MEDIA_AWS_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${MEDIA_AWS_SECRET_ACCESS_KEY}
-AWS_REGION=${AWS_REGION}
-S3_BUCKET=poodll-audioprocessing-out-${AWS_REGION}
-CLOUDPOODLL_URL=https://cloud.poodll.com
-REDIS_URL=redis://redis:6379
-ADMIN_EMAIL=${ADMIN_EMAIL}
-MEDIA_DOMAIN=${MEDIA_DOMAIN}
-AUTH_CACHE_TTL_OK=3600
-AUTH_CACHE_TTL_FAIL=60
-WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-small}
-WHISPER_DEVICE=${WHISPER_DEVICE:-auto}
-WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE:-auto}
-ENV
+USER_DATA=$(envsubst "$VARS_TO_SUBSTITUTE" < "deploy/userdata.sh")
 
-# Generate livekit + egress configs
-envsubst '\${LIVEKIT_API_KEY} \${LIVEKIT_API_SECRET}' \
-    < livekit.prod.yaml.template > livekit.prod.yaml
-envsubst '\${LIVEKIT_API_KEY} \${LIVEKIT_API_SECRET}' \
-    < egress.prod.yaml.template > egress.prod.yaml
-
-# Start stack
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d --build
-
-echo "=== Bootstrap complete ==="
-USEREOF
-)
 
 # ── 7. Launch Template ───────────────────────────────────────────────────────
 log "Creating Launch Template: $LAUNCH_TEMPLATE_NAME ..."
