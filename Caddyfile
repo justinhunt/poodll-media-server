@@ -10,5 +10,5 @@
 
 # WSS: LiveKit WebSocket signaling
 {$MEDIA_DOMAIN}:7880 {
-    reverse_proxy localhost:7880
+    reverse_proxy localhost:7888
 }

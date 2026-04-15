@@ -1,4 +1,4 @@
-port: 7880
+port: 7888
 bind_addresses:
     - ""
 rtc:
