@@ -5,10 +5,9 @@
 
 # HTTPS: token endpoint + test UI
 {$MEDIA_DOMAIN} {
-    reverse_proxy localhost:8000
-}
+    # LiveKit Signaling & API
+    reverse_proxy /rtc* localhost:7888
 
-# WSS: LiveKit WebSocket signaling
-{$MEDIA_DOMAIN}:7880 {
-    reverse_proxy localhost:7888
+    # Token Server & Test UI
+    reverse_proxy localhost:8000
 }

@@ -1,6 +1,6 @@
 port: 7888
 bind_addresses:
-    - ""
+    - "127.0.0.1"
 rtc:
     udp_port: 7882
     tcp_port: 7881
