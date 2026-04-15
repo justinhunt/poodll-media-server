@@ -5,10 +5,10 @@
 
 # HTTPS: token endpoint + test UI
 {$MEDIA_DOMAIN} {
-    reverse_proxy test-client:8000
+    reverse_proxy localhost:8000
 }
 
 # WSS: LiveKit WebSocket signaling
 {$MEDIA_DOMAIN}:7880 {
-    reverse_proxy livekit-server:7880
+    reverse_proxy localhost:7880
 }

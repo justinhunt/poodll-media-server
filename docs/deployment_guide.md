@@ -50,19 +50,19 @@ Either create in the AWS Console (EC2 → Key Pairs → Create key pair) or via 
 Use the aws-global or aws-china profile in AWS commands depending on the target region
 
 ```bash
-aws ec2 create-key-pair \
-    --key-name poodll-media-key \
+ aws ec2 create-key-pair \
+    --key-name poodll-media-key-eu \
     --region eu-west-1 \
     --profile aws-global \
     --query "KeyMaterial" \
-    --output text > poodll-media-key-eu.pem
-
- aws ec2 create-key-pair \
-    --key-name poodll-media-key \
+    --output text > poodll-media-key-eu.pem  
+	
+	 aws ec2 create-key-pair \
+    --key-name poodll-media-key-cn \
     --region cn-northwest-1 \
     --profile aws-china \
     --query "KeyMaterial" \
-    --output text > poodll-media-key-cn.pem    
+    --output text > poodll-media-key-cn.pem  
 
 chmod 400 poodll-media-key-eu.pem
 chmod 400 poodll-media-key-cn.pem
@@ -183,6 +183,7 @@ SSH to the instance ~2 minutes after the script completes:
 
 ```bash
 ssh -i poodll-media-key.pem ec2-user@<elastic-ip>
+# use the real ip if this fails, elastic ip might be slow or een broken
 
 # Watch the bootstrap log
 tail -f /var/log/userdata.log

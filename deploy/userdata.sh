@@ -12,10 +12,20 @@ exec > >(tee /var/log/userdata.log | logger -t userdata) 2>&1
 echo "=== Poodll Media Server Bootstrap ==="
 
 # ---------------------------------------------------------------------------
+# 0. Export variables for script scope
+# ---------------------------------------------------------------------------
+export LIVEKIT_API_KEY="${LIVEKIT_API_KEY}"
+export LIVEKIT_API_SECRET="${LIVEKIT_API_SECRET}"
+export MEDIA_DOMAIN="${MEDIA_DOMAIN}"
+export AWS_REGION="${AWS_REGION}"
+export ALLOC_ID="${ALLOC_ID}"
+export REPO_URL="${REPO_URL}"
+
+# ---------------------------------------------------------------------------
 # 1. System packages
 # ---------------------------------------------------------------------------
 yum update -y
-yum install -y git curl unzip gettext   # gettext provides envsubst
+yum install -y git unzip gettext   # gettext provides envsubst
 
 # ---------------------------------------------------------------------------
 # 2. Docker (Amazon Linux 2023 uses dnf)
@@ -24,11 +34,18 @@ yum install -y docker
 systemctl enable docker
 systemctl start docker
 
-# Docker Compose v2
+# Docker Compose v2 + Buildx
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+
+# Compose
+curl -L -f "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
      -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Buildx (Requires v0.17.0+ for latest Compose)
+BUILDX_URL=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest | grep "browser_download_url" | grep "linux-amd64" | grep -v ".json" | grep -v ".sigstore" | head -n 1 | cut -d '"' -f 4)
+curl -L -f "$BUILDX_URL" -o /usr/local/lib/docker/cli-plugins/docker-buildx
+chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
 # ---------------------------------------------------------------------------
 # 3. NVIDIA drivers + Container Toolkit
@@ -53,30 +70,43 @@ nvidia-ctk runtime configure --runtime=docker
 systemctl restart docker
 
 # ---------------------------------------------------------------------------
-# 4. Associate Elastic IP
+# 4. Associate Elastic IP (requires IMDSv2 token)
 # ---------------------------------------------------------------------------
-# This is aws's magic IP. i.e the script asks AWS: "What is my own unique Instance ID?"
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-aws ec2 associate-address \
-    --instance-id "$INSTANCE_ID" \
-    --allocation-id "${ALLOC_ID}" \
-    --region "${AWS_REGION}" || true
+echo "Associating Elastic IP..."
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
+
+if [ -n "$INSTANCE_ID" ]; then
+    aws ec2 associate-address \
+        --instance-id "$INSTANCE_ID" \
+        --allocation-id "${ALLOC_ID}" \
+        --region "${AWS_REGION}" || echo "Warning: EIP association failed"
+else
+    echo "Error: Could not retrieve Instance ID"
+fi
 
 # ---------------------------------------------------------------------------
 # 5. Clone repository
 # ---------------------------------------------------------------------------
-
-# !! Replace with your actual repo URL !!
+echo "Cloning repository..."
 REPO_URL="${REPO_URL}"
 DEPLOY_DIR="/opt/poodll-media-server"
-
 
 if [ -d "$DEPLOY_DIR" ]; then
     cd "$DEPLOY_DIR" && git pull
 else
     git clone "$REPO_URL" "$DEPLOY_DIR"
+    cd "$DEPLOY_DIR"
 fi
-cd "$DEPLOY_DIR/livekit-worker-setup"
+
+# Detect if we need to enter a subdirectory
+if [ -d "livekit-worker-setup" ]; then
+    echo "Found livekit-worker-setup subdirectory, entering..."
+    cd livekit-worker-setup
+else
+    echo "Files found in root directory, continuing..."
+fi
+
 
 # ---------------------------------------------------------------------------
 # 5. Write production environment file
@@ -88,14 +118,14 @@ cd "$DEPLOY_DIR/livekit-worker-setup"
 cat > .env.prod <<EOF
 LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
 LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-LIVEKIT_URL=ws://livekit-server:7880
+LIVEKIT_URL=ws://localhost:7880
 LIVEKIT_PUBLIC_URL=${LIVEKIT_PUBLIC_URL}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=${AWS_REGION}
 S3_BUCKET=poodll-audioprocessing-out-${AWS_REGION}
 CLOUDPOODLL_URL=${CLOUDPOODLL_URL}
-REDIS_URL=redis://redis:6379
+REDIS_URL=redis://localhost:6379
 ADMIN_EMAIL=${ADMIN_EMAIL}
 MEDIA_DOMAIN=${MEDIA_DOMAIN}
 AUTH_CACHE_TTL_OK=3600
@@ -104,13 +134,10 @@ RECORDING_READY_URL=
 EOF
 
 # ---------------------------------------------------------------------------
-# 6. Generate LiveKit + Egress configs from templates (inject API keys)
+# 6. Generate LiveKit + Egress configs from templates
 # ---------------------------------------------------------------------------
-envsubst '${LIVEKIT_API_KEY} ${LIVEKIT_API_SECRET}' \
-    < livekit.prod.yaml.template > livekit.prod.yaml
-
-envsubst '${LIVEKIT_API_KEY} ${LIVEKIT_API_SECRET}' \
-    < egress.prod.yaml.template > egress.prod.yaml
+envsubst < livekit.prod.yaml.template > livekit.prod.yaml
+envsubst < egress.prod.yaml.template > egress.prod.yaml
 
 # ---------------------------------------------------------------------------
 # 7. Start the stack

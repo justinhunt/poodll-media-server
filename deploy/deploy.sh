@@ -181,7 +181,8 @@ LT_DATA="{
   \"IamInstanceProfile\": {\"Name\": \"$IAM_ROLE_NAME\"},
   \"BlockDeviceMappings\": [{
     \"DeviceName\": \"/dev/xvda\",
-    \"Ebs\": {\"VolumeSize\": 50, \"VolumeType\": \"gp3\", \"DeleteOnTermination\": true}
+    \"Ebs\": {\"VolumeSize\": 100, \"VolumeType\": \"gp3\", \"DeleteOnTermination\": true}
+
   }],
   \"UserData\": \"$(echo "$USER_DATA" | base64 -w0)\"
 }"
@@ -246,6 +247,7 @@ CHANGE_BATCH="{
   }]
 }"
 awsg route53 change-resource-record-sets \
+    --region us-east-1 \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
     --change-batch "$CHANGE_BATCH" \
     --output text

@@ -91,7 +91,8 @@ openssl rand -hex 32   # API secret (~64 chars)
 | Instance type | `g4dn.xlarge` (or `g6.xlarge` for L4 regions) |
 | IAM role | `poodll-media-server-role` |
 | Security group | `poodll-media-server-sg` |
-| Storage | 50 GB gp3 |
+| Storage | 100 GB gp3 |
+
 | User data | Contents of `deploy/userdata.sh` (see below) |
 
 ### Populate User Data environment variables:
