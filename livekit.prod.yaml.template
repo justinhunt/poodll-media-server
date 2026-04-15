@@ -12,4 +12,4 @@ logging:
     level: info
 
 redis:
-    address: redis:6379
+    address: localhost:6379
